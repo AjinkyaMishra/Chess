@@ -35,7 +35,7 @@ io.on("connection", (uniquesocket) => {
   }
 
   else
-    uniquesocket.emit("spectator role");
+    uniquesocket.emit("spectatorRole");
   
   uniquesocket.on("disconnect", () => {
     if(uniquesocket.id === players.white) {
@@ -47,25 +47,28 @@ io.on("connection", (uniquesocket) => {
   })
 
   uniquesocket.on("move", (move) => {
-    try {
-      if(chess.turn() === 'w' && uniquesocket.id === players.white ) return;
-      if(chess.turn() === 'b' && uniquesocket.id === players.black ) return;
+  try {
+    if (chess.turn() === 'w' && uniquesocket.id !== players.white) return;
+    if (chess.turn() === 'b' && uniquesocket.id !== players.black) return;
 
-      const result = chess.move(move);
-      if(result) {
-        currentPlayer = chess.turn()
-        io.emit("move", move);
-        io.emit("boardState", chess.fen())
-      }
-      else{
-        console.log("Invalid Move :", move);
-        uniquesocket.emit("Invalid Move:", move);
-      }
-    } catch (error) {
-      console.log(error)
-      uniquesocket.emit("Invalid Move :", move)
-    }
-  })
+    const result = chess.move(move);
+    if (!result) return;
+
+    const gameState = {
+      fen: chess.fen(),
+      check: chess.isCheck(),
+      checkmate: chess.isCheckmate(),
+      draw: chess.isDraw(),
+      stalemate: chess.isStalemate(),
+      turn: chess.turn()
+};
+
+    io.emit("gameState", gameState);
+
+  } catch (err) {
+    console.log(err);
+  }
+});
 });
 
 server.listen(3000, () => {

@@ -9,6 +9,19 @@ let playerRole = null
 const renderBoard = () => {
   const board = chess.board();
   boardElement.innerHTML = "";
+
+  let kingInCheckSquare = null;
+
+  if (chess.in_check()) {
+    board.forEach((row, r) => {
+      row.forEach((sq, c) => {
+        if (sq && sq.type === "k" && sq.color === chess.turn()) {
+          kingInCheckSquare = { row: r, col: c };
+        }
+      });
+    });
+  }
+
   board.forEach((row, rowindex ) => {
     row.forEach((square, squareindex) => {
       const squareElement = document.createElement("div")
@@ -22,8 +35,12 @@ const renderBoard = () => {
       if (square) {
         const pieceElement = document.createElement("div");
         pieceElement.classList.add("piece", square.color === 'w' ? "white" : "black")
-        pieceElement.innerText = "";
+        pieceElement.innerText = getPieceUnicode(square);
         pieceElement.draggable = playerRole === square.color;
+
+      if ( kingInCheckSquare && kingInCheckSquare.row === rowindex && kingInCheckSquare.col === squareindex ) {
+        squareElement.classList.add("check");
+      }
         
         pieceElement.addEventListener("dragstart", (e) => {
           if(pieceElement.draggable){
@@ -57,29 +74,75 @@ const renderBoard = () => {
       boardElement.appendChild(squareElement)
     })
   })
-
+  if(playerRole === 'b'){
+    boardElement.classList.add("flipped")
+  }
+  else {
+    boardElement.classList.remove("flipped")
+  }
 }
 
-const handelMove = () => {}
-
-const getPieceUnicode = () => {
-  const unicodePieces = {
-    K: "♔",  // King
-    Q: "♕",  // Queen
-    R: "♖",  // Rook
-    B: "♗",  // Bishop
-    N: "♘",  // Knight
-    P: "♙",  // Pawn
-    k: "♚",  // King
-    q: "♛",  // Queen
-    r: "♜",  // Rook
-    b: "♝",  // Bishop
-    n: "♞",  // Knight
-    p: "♟"   // Pawn
+const handelMove = (source, target) => {
+  const move = {
+    from: `${String.fromCharCode(97+source.col)}${8-source.row}`,
+    to: `${String.fromCharCode(97+target.col)}${8-target.row}`,
+    promotion: 'q',
   }
 
-  return unicodePieces[piece.type] || ""
+  socket.emit("move", move)
 }
+
+const getPieceUnicode = (piece) => {
+  const white = {
+    p: "♙", r: "♖", n: "♘", b: "♗", q: "♕", k: "♔"
+  };
+  const black = {
+    p: "♟", r: "♜", n: "♞", b: "♝", q: "♛", k: "♚"
+  };
+
+  return piece.color === "w"
+    ? white[piece.type]
+    : black[piece.type];
+};
+
+socket.on("playerColor", (role) => {
+  playerRole = role;
+  renderBoard()
+})
+
+socket.on("spectatorRole", () => {
+  playerRole = null;
+  renderBoard()
+})
+
+socket.on("boardState", (fen) => {
+  chess.load(fen)
+  renderBoard();
+})
+
+socket.on("move", (move) => {
+  chess.move(move)
+  renderBoard();
+})
+
+socket.on("gameState", (state) => {
+  chess.load(state.fen);
+  renderBoard();
+
+  if (state.checkmate) {
+    const winner = state.turn === 'w' ? "Black" : "White";
+    alert(`♟️ CHECKMATE! ${winner} wins`);
+  }
+  else if (state.draw) {
+    alert("🤝 Game Draw");
+  }
+  else if (state.stalemate) {
+    alert("😐 Stalemate");
+  }
+  else if (state.check) {
+    console.log("Check!");
+  }
+});
 
 renderBoard();
 
